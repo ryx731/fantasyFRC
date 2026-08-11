@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy FRC Hub</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <meta name="google-signin-client_id" content="728415150431-8vf878u8hom1bro793kk85vki2l9i479.apps.googleusercontent.com">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-main: #09090b; --bg-card: #18181b; --text-main: #fafafa;
+            --text-muted: #a1a1aa; --accent: #F4BB38; --accent-hover: #d9a32c; --border: #27272a;
+            --accent-rgb: 244, 187, 56;
+            --grid-line: rgba(255,255,255,0.035);
+        }
+        [data-theme="light"] {
+            --bg-main: #f4f4f5; --bg-card: #ffffff; --text-main: #09090b; --text-muted: #71717a;
+            --accent: #F4BB38; --accent-hover: #d9a32c; --border: #e4e4e7;
+            --accent-rgb: 244, 187, 56;
+            --grid-line: rgba(0,0,0,0.035);
+        }
+        [data-theme="citrus"] {
+            --bg-main: #000000; --bg-card: #0c0c0c; --text-main: #ffffff; --text-muted: #888888;
+            --accent: #39FF14; --accent-hover: #2ecc10; --border: #1f3d1f;
+            --accent-rgb: 57, 255, 20;
+            --grid-line: rgba(57,255,20,0.04);
+        }
+        [data-theme="poofs"] {
+            --bg-main: #050b14; --bg-card: #0a1628; --text-main: #ffffff; --text-muted: #8aa2c0;
+            --accent: #00529B; --accent-hover: #003d75; --border: #162a45;
+            --accent-rgb: 0, 82, 155;
+            --grid-line: rgba(0,82,155,0.06);
+        }
+        [data-theme="hightide"] {
+            --bg-main: #03131D; --bg-card: #071E2E; --text-main: #ffffff; --text-muted: #648299;
+            --accent: #00D2FF; --accent-hover: #00a0c4; --border: #0e3550;
+            --accent-rgb: 0, 210, 255;
+            --grid-line: rgba(0,210,255,0.05);
+        }
+        [data-theme="orbit"] {
+            --bg-main: #0B0E14; --bg-card: #131822; --text-main: #ffffff; --text-muted: #7c889b;
+            --accent: #FF5500; --accent-hover: #cc4400; --border: #273142;
+            --accent-rgb: 255, 85, 0;
+            --grid-line: rgba(255,85,0,0.045);
+        }
+
+        * { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            transition: background-color 0.4s ease, color 0.4s ease;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 48px 48px;
+        }
+
+        /* Corner-bracket panel: the pit-display motif */
+        .panel {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            position: relative;
+            transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .panel::before, .panel::after,
+        .panel .bracket-tl, .panel .bracket-br {
+            content: '';
+            position: absolute;
+            width: 14px; height: 14px;
+            border-color: var(--accent);
+            opacity: 0.55;
+            transition: opacity 0.25s ease, width 0.25s ease, height 0.25s ease;
+            pointer-events: none;
+        }
+        .panel::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+        .panel::after { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+        .panel:hover::before, .panel:hover::after { opacity: 1; width: 20px; height: 20px; }
+        .panel:hover { transform: translateY(-2px); box-shadow: 0 12px 32px -8px rgba(0,0,0,0.45); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+
+        .btn-primary {
+            background-color: var(--accent); color: #000; font-weight: 700;
+            transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s;
+            position: relative; overflow: hidden;
+        }
+        .btn-primary:hover { transform: translateY(-1.5px); background-color: var(--accent-hover); box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.35); }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-ghost {
+            background-color: transparent; border: 1px solid var(--border); color: var(--text-main);
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .btn-ghost:hover { border-color: var(--accent); background-color: rgba(var(--accent-rgb), 0.06); }
+
+        .field {
+            background-color: transparent; border: 1px solid var(--border); color: var(--text-main);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15); }
+        .field::placeholder { color: var(--text-muted); }
+
+        .page { display: none; }
+        .page.active { display: block; animation: fadeUp 0.35s ease; }
+        .auth-hidden { display: none !important; }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.6); animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.55); } 70% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0); } 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0); } }
+
+        .nav-link { position: relative; color: var(--text-muted); transition: color 0.2s; }
+        .nav-link::after { content: ''; position: absolute; left: 0; bottom: -6px; width: 0; height: 2px; background: var(--accent); transition: width 0.2s ease; }
+        .nav-link:hover, .nav-link.link-active { color: var(--text-main); }
+        .nav-link:hover::after, .nav-link.link-active::after { width: 100%; }
+
+        .theme-swatch { transition: transform 0.15s, box-shadow 0.15s; }
+        .theme-swatch:hover { transform: translateY(-3px); }
+        .theme-swatch.theme-selected { box-shadow: 0 0 0 2px var(--bg-main), 0 0 0 4px var(--accent); }
+
+        ::selection { background-color: var(--accent); color: #000; }
+
+        .scanline-hero { position: relative; overflow: hidden; }
+        .scanline-hero::after {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: linear-gradient(180deg, transparent 0%, rgba(var(--accent-rgb), 0.04) 50%, transparent 100%);
+            background-size: 100% 6px;
+            opacity: 0.5;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .status-dot { animation: none; }
+            .page.active { animation: none; }
+            * { transition-duration: 0.01ms !important; }
+        }
+
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { opacity: 1; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <nav class="border-b sticky top-0 z-50 backdrop-blur-md" style="border-color: var(--border); background-color: color-mix(in srgb, var(--bg-main) 82%, transparent);">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 border-2 rounded-lg flex items-center justify-center font-black text-lg mono" style="border-color: var(--accent); color: var(--accent);">F</div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-tight leading-none">FANTASY <span style="color: var(--accent);">FRC</span></h1>
+                    <p class="mono text-[10px] tracking-widest uppercase leading-none mt-1" style="color: var(--text-muted);">Season Control</p>
+                </div>
+            </div>
+
+            <div id="navLinks" class="hidden md:flex items-center gap-8 font-semibold text-sm auth-hidden">
+                <a onclick="showPage('home')" data-nav="home" class="nav-link link-active cursor-pointer">Dashboard</a>
+                <a onclick="showPage('draft')" data-nav="draft" class="nav-link cursor-pointer">Draft Room</a>
+                <a onclick="showPage('profile')" data-nav="profile" class="nav-link cursor-pointer">Profile</a>
+            </div>
+
+            <div id="authBadge" class="mono text-xs"></div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-6 mt-6">
+
+        <!-- LOGIN GATE -->
+        <div id="loginGate" class="page active max-w-md mx-auto space-y-8 pt-10">
+            <div class="text-center space-y-3">
+                <div class="inline-flex items-center gap-2 mono text-[10px] uppercase tracking-widest px-3 py-1 rounded-full border" style="border-color: var(--border); color: var(--text-muted);">
+                    <span class="status-dot"></span> Authentication required
+                </div>
+                <h2 class="text-4xl font-black tracking-tight">Security Clearance</h2>
+                <p class="text-sm max-w-xs mx-auto" style="color: var(--text-muted)">Sign in to access the league hub, draft room, and live scoring.</p>
+            </div>
+
+            <div class="panel p-8 rounded-2xl space-y-5">
+                <div id="g_id_onload"
+                    data-client_id="728415150431-8vf878u8hom1bro793kk85vki2l9i479.apps.googleusercontent.com"
+                    data-context="signin"
+                    data-ux_mode="popup"
+                    data-callback="handleGoogleLogin"
+                    data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin flex justify-center" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+
+                <div class="flex items-center py-1">
+                    <div class="flex-grow border-t" style="border-color: var(--border);"></div>
+                    <span class="mono px-3 text-[10px] uppercase tracking-widest" style="color: var(--text-muted)">Or standard login</span>
+                    <div class="flex-grow border-t" style="border-color: var(--border);"></div>
+                </div>
+
+                <div class="space-y-3">
+                    <input id="authUsername" type="text" placeholder="Username" class="field w-full rounded-xl px-4 py-3 text-sm">
+                    <input id="authPassword" type="password" placeholder="Password" class="field w-full rounded-xl px-4 py-3 text-sm">
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="handleStandardAuth('login')" class="w-1/2 btn-primary py-3 rounded-xl text-sm">Login</button>
+                    <button onclick="handleStandardAuth('register')" class="w-1/2 btn-ghost font-bold py-3 rounded-xl text-sm">Register</button>
+                </div>
+                <p id="gateStatus" class="mono text-xs text-center min-h-[1em]" style="color: #f87171;"></p>
+            </div>
+        </div>
+
+        <!-- APP CONTENT -->
+        <div id="appContent" class="auth-hidden space-y-8">
+
+            <div id="home" class="page space-y-6">
+                <div class="scanline-hero panel rounded-2xl p-6 flex items-center justify-between overflow-hidden">
+                    <div>
+                        <p class="mono text-[10px] uppercase tracking-widest" style="color: var(--accent);">// Season Overview</p>
+                        <h2 class="text-2xl font-black mt-1">Dashboard</h2>
+                    </div>
+                    <div class="hidden sm:flex items-center gap-2 mono text-xs" style="color: var(--text-muted);">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="panel p-6 rounded-2xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-bold" style="color: var(--accent);">Create a League</h3>
+                            <span class="mono text-[10px] px-2 py-1 rounded border" style="border-color: var(--border); color: var(--text-muted);">NEW</span>
+                        </div>
+                        <input id="leagueName" type="text" placeholder="League name" class="field w-full rounded-xl px-4 py-3 text-sm">
+                        <button onclick="createLeague()" class="w-full btn-primary py-3 rounded-xl text-sm">Create League</button>
+                        <p id="leagueStatus" class="mono text-xs min-h-[1em]"></p>
+                    </div>
+                    <div class="panel p-6 rounded-2xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-bold" style="color: var(--accent);">Join League</h3>
+                            <span class="mono text-[10px] px-2 py-1 rounded border" style="border-color: var(--border); color: var(--text-muted);">ID</span>
+                        </div>
+                        <input id="joinLeagueId" type="number" placeholder="League ID" class="field w-full rounded-xl px-4 py-3 text-sm">
+                        <button onclick="joinLeague()" class="w-full btn-primary py-3 rounded-xl text-sm">Join League</button>
+                        <p id="joinStatus" class="mono text-xs min-h-[1em]"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="draft" class="page space-y-6">
+                <div class="panel rounded-2xl p-6">
+                    <p class="mono text-[10px] uppercase tracking-widest" style="color: var(--accent);">// Pick Terminal</p>
+                    <h2 class="text-2xl font-black mt-1">Live Draft Room</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="panel p-6 rounded-2xl space-y-4 md:col-span-1">
+                        <label class="mono text-[10px] uppercase tracking-widest block" style="color: var(--text-muted);">League</label>
+                        <input id="draftLeagueId" type="number" placeholder="League ID" class="field w-full rounded-xl px-4 py-3 text-sm">
+                        <label class="mono text-[10px] uppercase tracking-widest block" style="color: var(--text-muted);">Team Number</label>
+                        <input id="draftTeamNum" type="number" placeholder="e.g. 1690" class="field w-full rounded-xl px-4 py-3 text-sm">
+                        <button onclick="makePick()" class="w-full btn-primary py-3 rounded-xl text-sm">Lock Pick</button>
+                        <p id="pickStatus" class="mono text-xs min-h-[1em]"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="profile" class="page space-y-6">
+                <div class="panel rounded-2xl p-6 flex justify-between items-center">
+                    <div>
+                        <p class="mono text-[10px] uppercase tracking-widest" style="color: var(--accent);">// Operator Settings</p>
+                        <h2 class="text-2xl font-black mt-1">Profile & Settings</h2>
+                    </div>
+                    <button onclick="logout()" class="btn-ghost px-4 py-2.5 rounded-xl text-xs font-bold" style="color: #f87171; border-color: #7f1d1d;">Sign Out</button>
+                </div>
+                <div class="panel p-6 rounded-2xl space-y-4 max-w-lg">
+                    <h3 class="text-lg font-bold" style="color: var(--accent);">FRC Color Themes</h3>
+                    <p class="text-xs" style="color: var(--text-muted);">Match the hub to a team's competition colors.</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                        <button onclick="setTheme('default')" data-theme-btn="default" class="theme-swatch border rounded-xl py-3 text-xs font-bold flex flex-col items-center gap-1.5" style="border-color: var(--border); background: #09090b; color: #fafafa;">
+                            <span class="w-4 h-4 rounded-full" style="background:#F4BB38;"></span> Dark Gold
+                        </button>
+                        <button onclick="setTheme('light')" data-theme-btn="light" class="theme-swatch border rounded-xl py-3 text-xs font-bold flex flex-col items-center gap-1.5" style="border-color: var(--border); background: #f4f4f5; color: #09090b;">
+                            <span class="w-4 h-4 rounded-full" style="background:#F4BB38;"></span> Light
+                        </button>
+                        <button onclick="setTheme('citrus')" data-theme-btn="citrus" class="theme-swatch border rounded-xl py-3 text-xs font-bold flex flex-col items-center gap-1.5" style="border-color: #1f3d1f; background: #000; color: #39FF14;">
+                            <span class="w-4 h-4 rounded-full" style="background:#39FF14;"></span> Citrus
+                        </button>
+                        <button onclick="setTheme('poofs')" data-theme-btn="poofs" class="theme-swatch border rounded-xl py-3 text-xs font-bold flex flex-col items-center gap-1.5" style="border-color: #162a45; background: #050b14; color: #4d9fe0;">
+                            <span class="w-4 h-4 rounded-full" style="background:#00529B;"></span> 254 Poofs
+                        </button>
+                        <button onclick="setTheme('orbit')" data-theme-btn="orbit" class="theme-swatch border rounded-xl py-3 text-xs font-bold flex flex-col items-center gap-1.5" style="border-color: #273142; background: #0B0E14; color: #FF5500;">
+                            <span class="w-4 h-4 rounded-full" style="background:#FF5500;"></span> 1690 Orbit
+                        </button>
+                        <button onclick="setTheme('hightide')" data-theme-btn="hightide" class="theme-swatch border rounded-xl py-3 text-xs font-bold flex flex-col items-center gap-1.5" style="border-color: #0e3550; background: #03131D; color: #00D2FF;">
+                            <span class="w-4 h-4 rounded-full" style="background:#00D2FF;"></span> 4414 HighTide
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- AUTH & HTTP UTILITIES ---
+        let sessionToken = localStorage.getItem('frc_token');
+        let sessionUser = JSON.parse(localStorage.getItem('frc_user') || 'null');
+
+        async function apiFetch(url, options = {}) {
+            if (sessionToken) {
+                options.headers = { ...options.headers, 'Authorization': `Bearer ${sessionToken}` };
+            }
+            const res = await fetch(url, options);
+            if (res.status === 401) { logout(); }
+            return res;
+        }
+
+        function updateUIState() {
+            if (sessionToken && sessionUser) {
+                document.getElementById('loginGate').classList.remove('active');
+                document.getElementById('appContent').classList.remove('auth-hidden');
+                document.getElementById('navLinks').classList.remove('auth-hidden');
+                document.getElementById('authBadge').innerHTML = `<span class="px-3 py-1.5 rounded-lg border text-xs font-bold panel" style="border-color: var(--accent); color: var(--accent);">${sessionUser.username}</span>`;
+                showPage('home');
+            } else {
+                document.getElementById('appContent').classList.add('auth-hidden');
+                document.getElementById('navLinks').classList.add('auth-hidden');
+                document.getElementById('authBadge').innerHTML = '';
+                document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+                document.getElementById('loginGate').classList.add('active');
+            }
+        }
+        updateUIState();
+
+        function logout() {
+            localStorage.removeItem('frc_token');
+            localStorage.removeItem('frc_user');
+            sessionToken = null;
+            sessionUser = null;
+            updateUIState();
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('#appContent .page').forEach(el => el.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('link-active'));
+            const activeLink = document.querySelector(`[data-nav="${pageId}"]`);
+            if (activeLink) activeLink.classList.add('link-active');
+        }
+
+        // --- AUTH API LOGIC ---
+        function handleAuthSuccess(data) {
+            sessionToken = data.access_token;
+            sessionUser = { username: data.username, user_id: data.user_id };
+            localStorage.setItem('frc_token', sessionToken);
+            localStorage.setItem('frc_user', JSON.stringify(sessionUser));
+            updateUIState();
+        }
+
+        async function handleGoogleLogin(response) {
+            const res = await fetch('/api/auth/google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credential: response.credential })
+            });
+            if (res.ok) { handleAuthSuccess(await res.json()); }
+            else { document.getElementById('gateStatus').innerText = "Google auth failed."; }
+        }
+
+        async function handleStandardAuth(type) {
+            const username = document.getElementById('authUsername').value;
+            const password = document.getElementById('authPassword').value;
+            const statusEl = document.getElementById('gateStatus');
+            statusEl.innerText = '';
+
+            if (type === 'login') {
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                if (res.ok) handleAuthSuccess(await res.json()); else statusEl.innerText = (await res.json()).detail;
+            } else {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.ok) handleAuthSuccess(await res.json()); else statusEl.innerText = (await res.json()).detail;
+            }
+        }
+
+        // --- PROTECTED API LOGIC ---
+        async function createLeague() {
+            const name = document.getElementById('leagueName').value;
+            const res = await apiFetch('/api/leagues/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, owner_id: sessionUser.user_id })
+            });
+            document.getElementById('leagueStatus').innerText = res.ok ? `Created! ID: ${(await res.json()).league_id}` : (await res.json()).detail;
+        }
+
+        async function joinLeague() {
+            const leagueId = document.getElementById('joinLeagueId').value;
+            const res = await apiFetch(`/api/leagues/${leagueId}/join`, { method: 'POST' });
+            document.getElementById('joinStatus').innerText = res.ok ? "Joined!" : (await res.json()).detail;
+        }
+
+        async function makePick() {
+            const league_id = parseInt(document.getElementById('draftLeagueId').value);
+            const team_number = parseInt(document.getElementById('draftTeamNum').value);
+            const res = await apiFetch('/api/leagues/draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ league_id, user_id: sessionUser.user_id, team_number })
+            });
+            document.getElementById('pickStatus').innerText = res.ok ? "Pick locked!" : (await res.json()).detail;
+        }
+
+        // --- THEME LOGIC ---
+        function setTheme(themeName) {
+            if (themeName === 'default') {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.removeItem('frc_theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', themeName);
+                localStorage.setItem('frc_theme', themeName);
+            }
+            document.querySelectorAll('[data-theme-btn]').forEach(el => el.classList.remove('theme-selected'));
+            const activeBtn = document.querySelector(`[data-theme-btn="${themeName}"]`);
+            if (activeBtn) activeBtn.classList.add('theme-selected');
+        }
+        const savedTheme = localStorage.getItem('frc_theme');
+        setTheme(savedTheme || 'default');
+    </script>
+</body>
+</html>
