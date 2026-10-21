@@ -1,40 +1,38 @@
-def calculate_match_points(match_data: dict, team_key: str) -> dict:
-    if not match_data or "score_breakdown" not in match_data or not match_data["score_breakdown"]:
-        return {"total_points": 0, "breakdown": {}}
+"""Season-independent fantasy scoring. BIOCORE field mappings belong in an adapter.
 
-    alliance_color = None
-    if team_key in match_data.get("alliances", {}).get("red", {}).get("team_keys", []):
-        alliance_color = "red"
-    elif team_key in match_data.get("alliances", {}).get("blue", {}).get("team_keys", []):
-        alliance_color = "blue"
+Input metrics MUST describe one robot in one played match. Never pass alliance
+points as robot production. Missing metrics are an error, not silently zero.
+"""
+import math
 
-    if not alliance_color:
-        return {"total_points": 0, "breakdown": {}}
+METRICS = ['auto', 'teleop', 'endgame', 'cycles', 'win', 'fouls']
+PRESETS = {
+    'standard': {'auto': 1, 'teleop': 1, 'endgame': 1, 'cycles': 0, 'win': 5, 'fouls': -1},
+    'half_ppr': {'auto': 1, 'teleop': 1, 'endgame': 1, 'cycles': 0.5, 'win': 5, 'fouls': -1},
+    'ppr': {'auto': 1, 'teleop': 1, 'endgame': 1, 'cycles': 1, 'win': 5, 'fouls': -1},
+}
 
-    score_breakdown = match_data["score_breakdown"][alliance_color]
-    opponent_color = "blue" if alliance_color == "red" else "red"
+def default_rules(preset='standard'):
+    return {'version': 'biocore-placeholder-v1', 'preset': preset,
+            'aggregation': 'average', 'weights': PRESETS[preset].copy()}
 
-    total_score = match_data["alliances"][alliance_color]["score"]
-    opponent_score = match_data["alliances"][opponent_color]["score"]
+def score_metrics(metrics, rules):
+    weights = rules['weights']
+    missing = [key for key, weight in weights.items() if weight and key not in metrics]
+    if missing:
+        raise ValueError('Missing required robot metrics: ' + ', '.join(missing))
+    if any(key not in METRICS for key in metrics):
+        raise ValueError('Unknown metric; update the season adapter first')
+    for key, value in metrics.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            raise ValueError(f'{key} must be a finite, nonnegative number')
+    if metrics.get('win', 0) not in (0, 0.5, 1):
+        raise ValueError('win must be 0, 0.5 (tie), or 1')
+    return round(sum(metrics.get(key, 0) * weight for key, weight in weights.items()), 4)
 
-    auto_points = score_breakdown.get("autoPoints", 0)
-    teleop_points = score_breakdown.get("teleopPoints", 0)
-    endgame_points = score_breakdown.get("endgamePoints", 0)
-
-    win_bonus = 0
-    if total_score > opponent_score:
-        win_bonus = 10
-    elif total_score == opponent_score:
-        win_bonus = 5
-
-    fantasy_score = round((auto_points + teleop_points + endgame_points) / 3.0 + win_bonus, 2)
-
-    return {
-        "total_points": fantasy_score,
-        "breakdown": {
-            "auto": auto_points,
-            "teleop": teleop_points,
-            "endgame": endgame_points,
-            "win_bonus": win_bonus
-        }
-    }
+def calculate_match_points(match_data, team_key):
+    """Compatibility entry point: normalized robot metrics only; no alliance / 3 estimate."""
+    metrics = (match_data or {}).get('robot_metrics', {}).get(team_key)
+    if metrics is None:
+        return {'total_points': 0, 'breakdown': {}, 'status': 'AWAITING_ROBOT_DATA'}
+    return {'total_points': score_metrics(metrics, default_rules()), 'breakdown': metrics}

@@ -1,21 +1,29 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
 from fastapi.responses import FileResponse
-from src.database import engine, Base
-from src.tba_client import TBAClient
-from src.scoring import calculate_match_points
-from src.routers import leagues, auth # Import auth here
+from fastapi.staticfiles import StaticFiles
 
-Base.metadata.create_all(bind=engine)
+from src.database import Base, engine
+from src.routers import auth, leagues
+from src.migrations import migrate
 
-app = FastAPI(title="Fantasy FRC Engine")
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
-app.include_router(auth.router)    # Mount Auth routes
-app.include_router(leagues.router) # Mount League routes
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    migrate(engine)
+    yield
 
-# (Keep your existing TBA routes here...)
-@app.get("/")
+
+app = FastAPI(title="Fantasy FRC Engine", lifespan=lifespan)
+app.include_router(auth.router)
+app.include_router(leagues.router)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
 def read_index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")

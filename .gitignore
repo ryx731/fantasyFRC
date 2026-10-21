@@ -12,3 +12,7 @@ fantasy_frc.db
 # 76
 __pycache__/
 *.pyc
+# Local database backups
+*.db.*.bak
+*.db-wal
+*.db-shm

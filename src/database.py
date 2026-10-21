@@ -1,13 +1,16 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Database URL
-DATABASE_URL = "sqlite:///./fantasy_frc.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fantasy_frc.db")
 
 # Create engine
 engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False}
+    DATABASE_URL, connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 )
 
 # Create session factory
@@ -21,5 +24,8 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
