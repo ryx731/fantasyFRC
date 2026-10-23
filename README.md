@@ -14,6 +14,10 @@ Open http://localhost:8000. Use Python 3.10+ and install `requirements.txt` when
 
 ## League experience
 
+Administrators sign in through the regular login form. The Admin button opens a server-authorized overview of accounts and leagues. Provision or reset a local administrator with `.\.venv\Scripts\python.exe -m src.manage_admin admin`; enter the password at the prompts. Passwords are hashed with Argon2, and registration cannot grant the admin role. Account provisioning is explicit and never resets a password at startup. League commissioner permissions continue to follow league ownership.
+
+Team appearance options include labeled palette previews and a selected state. Branding references and color adaptations are recorded in `static/THEMES.md`.
+
 - My leagues dashboard; private league membership and persistent league navigation.
 - Cryptographically random 12-character invite codes, with commissioner rotation. Database IDs are internal identifiers and cannot be used to join.
 - Configurable manager capacity, roster size, starters, regular-season scoring periods, and optional four-manager playoffs.

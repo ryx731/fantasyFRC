@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src.database import Base
 
 COLUMNS = {
+    'users': {'is_admin': 'BOOLEAN NOT NULL DEFAULT 0'},
     'leagues': {
         'invite_code': 'VARCHAR', 'roster_size': 'INTEGER DEFAULT 5',
         'starter_count': 'INTEGER DEFAULT 3', 'regular_weeks': 'INTEGER DEFAULT 6',

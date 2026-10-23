@@ -54,6 +54,23 @@ def run():
                 assert status == 200, data
                 sessions.append(data)
             owner, guest, outsider = [s['access_token'] for s in sessions]
+            assert request(base, '/api/admin/overview')[0] == 401
+            assert request(base, '/api/admin/overview', token=owner)[0] == 403
+            assert request(base, '/api/auth/me', token=owner)[1]['is_admin'] is False
+            from sqlalchemy.orm import Session
+            from src.models import User
+            with Session(engine) as db:
+                user = db.query(User).filter_by(username='alpha').one()
+                user.is_admin = True
+                db.commit()
+            status, overview = request(base, '/api/admin/overview', token=owner)
+            assert status == 200 and len(overview['users']) == 3
+            assert all('hashed_password' not in user for user in overview['users'])
+            with Session(engine) as db:
+                user = db.query(User).filter_by(username='alpha').one()
+                user.is_admin = False
+                db.commit()
+            assert request(base, '/api/admin/overview', token=owner)[0] == 403
             status, created = request(base, '/api/leagues/create', {'name': 'HTTP league', 'max_teams': 2, 'roster_size': 2, 'starter_count': 1, 'regular_weeks': 1}, owner)
             assert status == 200, created
             lid = created['league_id']; prefix = f'/api/leagues/{lid}'

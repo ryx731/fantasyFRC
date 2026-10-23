@@ -7,6 +7,20 @@ try { user = JSON.parse(localStorage.getItem('frc_user')); } catch { /* invalid 
 const draftLabel = status => ({PRE_DRAFT:'PRE DRAFT',ACTIVE:'DRAFT LIVE',COMPLETED:'DRAFT COMPLETE'}[status] || status);
 const tabs = [['home','League home'],['team','My team'],['draft','Draft room'],['players','FRC teams'],['matchups','Matchups'],['standings','Standings'],['transactions','Transactions'],['scoring','Scoring & rules']];
 const catalog = [[254,'The Cheesy Poofs'],[1678,'Citrus Circuits'],[1690,'Orbit'],[4414,'HighTide'],[1114,'Simbotics'],[2056,'OP Robotics'],[148,'Robowranglers'],[118,'Robonauts'],[1323,'MadTown Robotics'],[973,'Greybots'],[2910,'Jack in the Bot'],[6328,'Mechanical Advantage']];
+const themes = [
+    {id:'default',name:'Fantasy FRC',colors:['#f4bb38','#101216','#f5f6f8'],description:'Gold · charcoal'},
+    {id:'light',name:'Light',colors:['#ffffff','#885b00','#152034'],description:'White · warm gold'},
+    {id:'citrus',name:'1678 · Citrus Circuits',colors:['#80c342','#171e27','#ffffff'],description:'Citrus green · dark navy · white'},
+    {id:'poofs',name:'254 · The Cheesy Poofs',colors:['#0070ff','#232323','#ffffff'],description:'Royal blue · black · white'},
+    {id:'orbit',name:'1690 · Orbit',colors:['#0000cc','#ffffff','#141430'],description:'Deep blue · white'},
+    {id:'hightide',name:'4414 · HighTide',colors:['#51b3b0','#1b4652','#000000'],description:'Teal · deep ocean · black'},
+];
+function renderThemes() {
+    $('themes').innerHTML=themes.map(t=>{
+        const selected=document.documentElement.dataset.theme===t.id;
+        return `<button type="button" class="theme-choice" data-action="theme" data-theme-choice="${t.id}" aria-pressed="${selected}"><span class="theme-swatches" aria-hidden="true">${t.colors.map(c=>`<i style="--swatch:${c}"></i>`).join('')}</span><strong>${t.name}</strong><small>${t.description}</small><span class="theme-state">${selected?'✓ Selected':'Choose theme'}</span></button>`;
+    }).join('');
+}
 const metricLabels = {auto:'Autonomous production',teleop:'Teleop production',endgame:'Endgame contribution',cycles:'Completed scoring cycles',win:'Win / tie bonus',fouls:'Foul penalty units'};
 const button = (text, action, attrs='', style='ghost small') => `<button class="${style}" data-action="${action}" ${attrs}>${text}</button>`;
 const empty = (title, text) => `<div class="empty"><div class="empty-symbol">◇</div><h2>${title}</h2><p class="muted">${text}</p></div>`;
@@ -25,7 +39,7 @@ async function api(path, body, method='POST') {
     return data;
 }
 function logout() { token=null;user=null;league=null;localStorage.removeItem('frc_token');localStorage.removeItem('frc_user');location.hash='leagues';route(); }
-function signedIn(data) { token=data.access_token;user={username:data.username,user_id:data.user_id};localStorage.setItem('frc_token',token);localStorage.setItem('frc_user',JSON.stringify(user));$('password').value='';route(); }
+function signedIn(data) { token=data.access_token;user={username:data.username,user_id:data.user_id,is_admin:!!data.is_admin};localStorage.setItem('frc_token',token);localStorage.setItem('frc_user',JSON.stringify(user));$('password').value='';route(); }
 function theme(name) { document.documentElement.dataset.theme=name;localStorage.setItem('frc_theme',name); }
 function showModal(title, html) { $('modalTitle').textContent=title;$('modalBody').innerHTML=html+'<p class="dialog-status error" role="status" id="dialogStatus"></p>';$('modal').showModal(); }
 function closeModal() { $('modal').close(); }
@@ -37,18 +51,23 @@ function select(name,label,options) { return `<label>${label}<select name="${nam
 function activity(items) { return items.length?items.map(a=>`<div class="activity"><span class="tag">${esc(a.kind)}</span> ${esc(a.text)}<time datetime="${esc(a.at)}">${time(a.at)}</time></div>`).join(''):'<p class="muted">League activity will appear here.</p>'; }
 async function route() {
     clearInterval(refreshTimer); const serial=++routeSerial;
-    for(const id of ['gate','dashboard','league','profile']) $(id).hidden=true;
+    for(const id of ['gate','dashboard','league','profile','admin']) $(id).hidden=true;
     $('profileButton').hidden=$('logoutButton').hidden=!(token&&user);
+    $('adminButton').hidden=!(token&&user?.is_admin);
     if(!token||!user) { $('gate').hidden=false;return; }
     const parts=location.hash.replace('#','').split('/');
-    if(parts[0]==='profile') { $('profile').hidden=false;$('profileUser').textContent=`Signed in as ${user.username}`;$('themes').innerHTML=['default','light','citrus','poofs','orbit','hightide'].map(t=>button(t,'theme',`data-theme="${t}" aria-pressed="${document.documentElement.dataset.theme===t}"`)).join('');return; }
+    if(parts[0]==='profile') { $('profile').hidden=false;$('profileUser').textContent=`Signed in as ${user.username}${user.is_admin?' · Administrator':''}`;renderThemes();return; }
     try {
-        if(parts[0]==='league'&&/^\d+$/.test(parts[1])) {
+        if(parts[0]==='admin') {
+            $('admin').hidden=false;$('admin').innerHTML='<div class="page-loading">Loading administration…</div>';
+            const data=await api('/api/admin/overview');if(serial!==routeSerial)return;
+            $('admin').innerHTML=`<p class="eyebrow">SITE ADMINISTRATION</p><h1>Administration</h1><div class="stat-grid"><div class="stat"><strong>${data.users.length}</strong><span>Accounts</span></div><div class="stat"><strong>${data.leagues.length}</strong><span>Leagues</span></div></div><div class="panel"><h2>Accounts</h2><div class="table-wrap"><table><thead><tr><th>Username</th><th>Role</th></tr></thead><tbody>${data.users.map(u=>`<tr><td>${esc(u.username)}</td><td>${u.is_admin?'Administrator':'Manager'}</td></tr>`).join('')}</tbody></table></div></div><div class="panel"><h2>Leagues</h2>${data.leagues.length?`<div class="table-wrap"><table><thead><tr><th>League</th><th>Commissioner</th><th>Managers</th><th>Draft</th></tr></thead><tbody>${data.leagues.map(l=>`<tr><td>${esc(l.name)}</td><td>${esc(l.commissioner)}</td><td>${l.member_count}</td><td>${esc(draftLabel(l.draft_status))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No leagues yet.</p>'}</div>`;
+        } else if(parts[0]==='league'&&/^\d+$/.test(parts[1])) {
             $('league').hidden=false;$('leagueContent').innerHTML='<div class="page-loading">Loading your league…</div>';
             const data=await api(`/api/leagues/${parts[1]}`);if(serial!==routeSerial)return;league=data;renderLeague(parts[2]||'home');
             if(parts[2]==='draft') refreshTimer=setInterval(async()=>{if(document.hidden||$('modal').open)return;try{const d=await api(`/api/leagues/${parts[1]}`);if(serial!==routeSerial)return;if(d.draft.current_pick_index===league.draft.current_pick_index&&d.draft.status===league.draft.status&&d.member_count===league.member_count){league=d;return;}const pickField=document.querySelector('[data-form="pick"] input[name="team_number"]');const draftInput=pickField?.value;const draftFocused=document.activeElement===pickField;league=d;renderLeague('draft');const freshField=document.querySelector('[data-form="pick"] input[name="team_number"]');if(freshField&&draftInput&&d.draft.current_picker_id===user.user_id){freshField.value=draftInput;if(draftFocused)freshField.focus();}}catch(e){clearInterval(refreshTimer);notify(e.message,true);}},7000);
         } else { $('dashboard').hidden=false;$('dashboard').innerHTML='<div class="page-loading">Loading your leagues…</div>';const data=await api('/api/leagues');if(serial!==routeSerial)return;renderDashboard(data); }
-    } catch(error) { if(serial!==routeSerial)return;const target=parts[0]==='league'?'leagueContent':'dashboard';$(target).innerHTML=empty('Couldn’t load this page',esc(error.message))+'<a href="#leagues" class="button ghost">My leagues</a>';notify(error.message,true); }
+    } catch(error) { if(serial!==routeSerial)return;const target=parts[0]==='admin'?'admin':parts[0]==='league'?'leagueContent':'dashboard';$(target).innerHTML=empty('Couldn’t load this page',esc(error.message))+'<a href="#leagues" class="button ghost">My leagues</a>';notify(error.message,true); }
 }
 function renderDashboard(leagues) {
     $('dashboard').innerHTML=`<div class="section-head"><div><p class="eyebrow">LEAGUE HEADQUARTERS</p><h1>Good to have you back, ${esc(user.username)}.</h1><p class="lead">Your leagues. Your lineups. Your next winning move.</p></div><div class="row">${button('Join a league','join','','ghost')}${button('+ Create league','create','','primary')}</div></div><div class="banner"><strong>BIOCORE preseason</strong> · Draft and organize your league now. Production, cycle, and bonus scoring templates stay provisional until your commissioner activates the season configuration.</div><div class="row between"><h2>My leagues <span class="muted">${leagues.length}</span></h2><span class="muted">Private leagues · Invite code required</span></div>${leagues.length?`<div class="grid">${leagues.map(l=>`<article class="panel league-card"><div class="row between"><span class="tag">${esc(draftLabel(l.draft_status))}</span><span class="muted">${l.member_count} / ${l.max_teams} managers</span></div><h2>${esc(l.name)}</h2><p class="muted">${esc(l.my_team_name)}<br>${l.starter_count} starters · ${l.roster_size-l.starter_count} bench · ${l.regular_weeks} periods</p><a class="button ghost full" href="#league/${l.id}/home">Open league <span aria-hidden="true">→</span></a></article>`).join('')}</div>`:`<div class="panel">${empty('Your first league starts here','Create a private league and invite your friends, or enter a code from your commissioner.')}</div>`}`;
@@ -118,7 +137,7 @@ create(){showModal('Create your league',`<form data-form="create">${field('name'
 join(){showModal('Join a private league',`<form data-form="join">${field('code','12-character invite code','text','','required pattern="[a-fA-F0-9]{12}" minlength="12" maxlength="12" placeholder="A7C9E2B4D6F8" autocomplete="off"')}<p class="muted">Ask your commissioner for the code. Joining closes when the draft starts.</p><button class="primary full">Join league</button></form>`);},
 invite(){showModal('Invite your friends',`<p class="muted">Share this code. Friends can sign in and choose “Join a league.”</p><p class="code">${esc(league.invite_code)}</p>${button('Copy invite code','copy-invite','','primary full')}<p class="muted">${league.member_count} / ${league.max_teams} managers · Joining ${league.draft_status==='PRE_DRAFT'?'open':'closed'}</p>`);},
 async 'copy-invite'(){await navigator.clipboard.writeText(league.invite_code);notify('Invite code copied');},
-refresh(){return route();},theme(el){theme(el.dataset.theme);route();},
+refresh(){return route();},theme(el){const choice=el.dataset.themeChoice;theme(choice);renderThemes();document.querySelector(`[data-theme-choice="${choice}"]`).focus({preventScroll:true});},
 rename(){showModal('Name your fantasy team',`<form data-form="rename">${field('name','Team name','text',mine().name,'required maxlength="100"')}<button class="primary full">Save team name</button></form>`);},
 'start-draft'(){confirmAction('Start the snake draft?',`This closes joining and randomizes the order for ${league.member_count} managers. Each will draft ${league.roster_size} FRC teams. The draft cannot be reset. Ensure every manager is ready.`,'start-draft');},
 'confirm-start-draft'(){return mutate('draft/start');},
@@ -166,5 +185,7 @@ $('authToggle').addEventListener('click',()=>{registerMode=!registerMode;$('auth
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();$('main').focus();});
 $('closeModal').addEventListener('click',closeModal);$('logoutButton').addEventListener('click',logout);$('profileButton').addEventListener('click',()=>location.hash='profile');
 $('rulesLink').addEventListener('click',event=>{event.preventDefault();if(league){location.hash=leaguePath('scoring');return;}showModal('Fantasy FRC scoring','<p>Leagues choose production weights, win bonuses, and foul deductions. Half and full PPR templates add points per completed scoring cycle. Starter robot match points are averaged or summed over a period.</p><p class="muted">BIOCORE templates remain provisional until the commissioner reviews the released game and activates season rules.</p>');});
-window.addEventListener('hashchange',route);const savedTheme=localStorage.getItem('frc_theme');theme(['default','light','citrus','poofs','orbit','hightide'].includes(savedTheme)?savedTheme:'default');route();
+window.addEventListener('hashchange',route);const savedTheme=localStorage.getItem('frc_theme');theme(themes.some(t=>t.id===savedTheme)?savedTheme:'default');route();
+if(token&&user) api('/api/auth/me').then(data=>{if(!token)return;user=data;localStorage.setItem('frc_user',JSON.stringify(user));route();}).catch(error=>notify(error.message,true));
+$('adminButton').onclick=()=>{location.hash='admin';};
 fetch('/api/auth/config').then(r=>r.json()).then(config=>{if(!config.google_client_id)return;const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;script.onload=()=>{google.accounts.id.initialize({client_id:config.google_client_id,callback:async response=>{try{signedIn(await api('/api/auth/google',{credential:response.credential}));}catch(error){$('authStatus').textContent=error.message;}}});google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large'});};document.head.appendChild(script);}).catch(()=>{});

@@ -10,7 +10,7 @@ from google.auth.transport import requests
 
 from src.database import get_db
 from src.models import User
-from src.auth import get_password_hash, verify_password, create_access_token
+from src.auth import get_password_hash, verify_password, create_access_token, get_current_user
 from src.schemas import UserAuth
 
 load_dotenv()
@@ -30,6 +30,7 @@ def auth_response(user: User) -> dict:
         "token_type": "bearer",
         "user_id": user.id,
         "username": user.username,
+        "is_admin": bool(user.is_admin),
     }
 
 
@@ -95,3 +96,11 @@ def google_auth(token: GoogleToken, db: Session = Depends(get_db)):
 @router.get('/config')
 def auth_config():
     return {'google_client_id': GOOGLE_CLIENT_ID}
+
+
+@router.get('/me')
+def current_account(username: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter_by(username=username).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail='User no longer exists')
+    return {'user_id': user.id, 'username': user.username, 'is_admin': bool(user.is_admin)}

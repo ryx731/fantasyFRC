@@ -9,7 +9,7 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header><a class="brand" href="#leagues"><span class="brand-mark">F</span><span>FANTASY <b>FRC</b><small>BUILD YOUR WINNING ALLIANCE</small></span></a><div class="header-right"><span class="pill">BIOCORE · PRESEASON</span><button id="profileButton" class="ghost" hidden>Settings</button><button id="logoutButton" class="ghost" hidden>Sign out</button></div></header>
+<header><a class="brand" href="#leagues"><span class="brand-mark">F</span><span>FANTASY <b>FRC</b><small>BUILD YOUR WINNING ALLIANCE</small></span></a><div class="header-right"><span class="pill">BIOCORE · PRESEASON</span><button id="adminButton" class="ghost" hidden>Admin</button><button id="profileButton" class="ghost" hidden>Settings</button><button id="logoutButton" class="ghost" hidden>Sign out</button></div></header>
 <div id="notice" role="status" aria-live="polite" hidden></div>
 <main id="main" tabindex="-1">
 <section id="gate" class="auth-layout" hidden>
@@ -17,8 +17,9 @@
 <form id="authForm" class="panel"><p class="eyebrow">WELCOME TO FANTASY FRC</p><h2 id="authTitle">Sign in to your leagues</h2><label>Username<input id="username" autocomplete="username" required maxlength="50"></label><label>Password<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary full" type="submit" id="authSubmit">Sign in</button><button class="ghost full" type="button" id="authToggle">New here? Create an account</button><div id="googleButton"></div><p id="authStatus" role="status" class="muted"></p></form>
 </section>
 <section id="dashboard" hidden></section>
+<section id="admin" hidden></section>
 <section id="league" hidden><div id="leagueHeading"></div><nav id="leagueTabs" aria-label="League navigation"></nav><div id="leagueContent"></div></section>
-<section id="profile" hidden><p class="eyebrow">YOUR PREFERENCES</p><h1>Make it your home field.</h1><div class="panel"><h2>Appearance</h2><div id="themes" class="feature-row"></div><p class="muted" id="profileUser"></p><a href="#leagues" class="button ghost">Back to my leagues</a></div></section>
+<section id="profile" hidden><p class="eyebrow">YOUR PREFERENCES</p><h1>Make it your home field.</h1><div class="panel"><h2>Appearance</h2><div id="themes" class="theme-grid" aria-label="Color scheme"></div><p class="muted" id="profileUser"></p><a href="#leagues" class="button ghost">Back to my leagues</a></div></section>
 </main>
 <footer><span>FANTASY FRC</span><span>Independent fantasy competition · Not affiliated with FIRST</span><a href="#rules" id="rulesLink">How scoring works</a></footer>
 <dialog id="modal"><div class="dialog-head"><h2 id="modalTitle"></h2><button id="closeModal" class="ghost" aria-label="Close dialog">✕</button></div><div id="modalBody"></div></dialog>

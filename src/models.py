@@ -11,6 +11,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     theme_preference = Column(String, default="default")
+    is_admin = Column(Boolean, default=False, nullable=False)
 
     leagues_owned = relationship("League", back_populates="owner")
     rosters = relationship("Roster", back_populates="user")
