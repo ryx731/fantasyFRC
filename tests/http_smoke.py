@@ -11,13 +11,15 @@ import tempfile
 import time
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from urllib.parse import urlencode
 
 PROJECT = Path(__file__).resolve().parents[1]
 
-def request(base, path, body=None, token=None, method=None):
-    headers = {'Content-Type': 'application/json'}
+def request(base, path, body=None, token=None, method=None, form=False):
+    headers = {'Content-Type': 'application/x-www-form-urlencoded' if form else 'application/json'}
     if token: headers['Authorization'] = 'Bearer ' + token
-    req = Request(base + path, data=json.dumps(body).encode() if body is not None else None,
+    data = (urlencode(body).encode() if form else json.dumps(body).encode()) if body is not None else None
+    req = Request(base + path, data=data,
                   headers=headers, method=method or ('POST' if body is not None else 'GET'))
     try:
         with urlopen(req, timeout=15) as response:
@@ -54,6 +56,9 @@ def run():
                 assert status == 200, data
                 sessions.append(data)
             owner, guest, outsider = [s['access_token'] for s in sessions]
+            assert request(base, '/api/auth/login', {'username': 'alpha', 'password': 'incorrect'}, form=True)[0] == 401
+            status, login = request(base, '/api/auth/login', {'username': 'alpha', 'password': 'test-only-password'}, form=True)
+            assert status == 200 and login['user_id'] == sessions[0]['user_id'] and login['is_admin'] is False
             assert request(base, '/api/admin/overview')[0] == 401
             assert request(base, '/api/admin/overview', token=owner)[0] == 403
             assert request(base, '/api/auth/me', token=owner)[1]['is_admin'] is False
@@ -66,6 +71,7 @@ def run():
             status, overview = request(base, '/api/admin/overview', token=owner)
             assert status == 200 and len(overview['users']) == 3
             assert all('hashed_password' not in user for user in overview['users'])
+            assert request(base, '/api/auth/login', {'username': 'alpha', 'password': 'test-only-password'}, form=True)[1]['is_admin'] is True
             with Session(engine) as db:
                 user = db.query(User).filter_by(username='alpha').one()
                 user.is_admin = False

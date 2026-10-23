@@ -28,7 +28,13 @@ def get_password_hash(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against Argon2 hash"""
-    return pwd_context.identify(hashed_password) is not None and pwd_context.verify(plain_password, hashed_password)
+    if not isinstance(hashed_password, str) or not hashed_password:
+        return False
+    try:
+        return pwd_context.identify(hashed_password) is not None and pwd_context.verify(plain_password, hashed_password)
+    except (ValueError, TypeError):
+        # A damaged or legacy hash is invalid credentials, not a server error.
+        return False
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):

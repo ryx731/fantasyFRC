@@ -4,8 +4,10 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Your fantasy FRC league headquarters. Draft an alliance, set your lineup, and compete all season.">
 <title>Fantasy FRC · League headquarters</title>
-<link rel="stylesheet" href="/static/styles.css">
-<script src="/static/app.js" defer></script>
+<meta name="theme-color" content="#101216">
+<script src="/static/theme-boot.js?v=__ASSET_VERSION__"></script>
+<link rel="stylesheet" href="/static/styles.css?v=__ASSET_VERSION__">
+<script src="/static/app.js?v=__ASSET_VERSION__" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -19,7 +21,7 @@
 <section id="dashboard" hidden></section>
 <section id="admin" hidden></section>
 <section id="league" hidden><div id="leagueHeading"></div><nav id="leagueTabs" aria-label="League navigation"></nav><div id="leagueContent"></div></section>
-<section id="profile" hidden><p class="eyebrow">YOUR PREFERENCES</p><h1>Make it your home field.</h1><div class="panel"><h2>Appearance</h2><div id="themes" class="theme-grid" aria-label="Color scheme"></div><p class="muted" id="profileUser"></p><a href="#leagues" class="button ghost">Back to my leagues</a></div></section>
+<section id="profile" hidden><div class="section-head"><div><p class="eyebrow">THE PERSONAL TOUCH</p><h1>Make it your home field.</h1><p class="lead">A familiar team. A fresh perspective. Find your colors.</p></div><a href="#leagues" class="button ghost"><span aria-hidden="true">←</span> My leagues</a></div><div class="panel appearance-panel"><div class="row between"><div><h2>Appearance</h2><p class="muted">Pick a palette. Every part of your league follows your lead.</p></div><span class="pill">6 CURATED PALETTES</span></div><div id="themes" class="theme-grid" role="group" aria-label="Color scheme"></div><div class="settings-foot"><p class="muted" id="profileUser"></p><span class="muted"><span class="status-dot" aria-hidden="true"></span> Saved on this browser</span></div></div></section>
 </main>
 <footer><span>FANTASY FRC</span><span>Independent fantasy competition · Not affiliated with FIRST</span><a href="#rules" id="rulesLink">How scoring works</a></footer>
 <dialog id="modal"><div class="dialog-head"><h2 id="modalTitle"></h2><button id="closeModal" class="ghost" aria-label="Close dialog">✕</button></div><div id="modalBody"></div></dialog>

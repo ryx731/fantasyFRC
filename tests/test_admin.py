@@ -52,6 +52,15 @@ class AdminTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             admin.require_admin(user)
 
+    def test_damaged_password_hash_rejects_login_without_server_error(self):
+        self.db.add(User(username='damaged', hashed_password='$argon2id$corrupt'))
+        self.db.commit()
+        with self.assertRaises(HTTPException) as error:
+            auth.login_user(OAuth2PasswordRequestForm(username='damaged', password='anything'), self.db)
+        self.assertEqual(error.exception.status_code, 401)
+        self.assertFalse(verify_password('anything', None))
+        self.assertFalse(verify_password('anything', '$argon2id$v=19$m=65536,t=3,p=4$broken$broken'))
+
     def test_legacy_accounts_remain_non_admin(self):
         self.db.close()
         Base.metadata.drop_all(self.engine)

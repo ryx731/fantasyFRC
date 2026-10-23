@@ -10,7 +10,7 @@ From this project directory:
 .\.venv\Scripts\python.exe -m uvicorn src.main:app --reload
 ```
 
-Open http://localhost:8000. Use Python 3.10+ and install `requirements.txt` when creating a new virtual environment. Copy `.env.example` to `.env` and configure a stable `SECRET_KEY`. Without it, sessions expire across restarts. `DATABASE_URL` defaults to `sqlite:///./fantasy_frc.db`. Google sign-in uses `GOOGLE_CLIENT_ID` from the server configuration; the browser no longer has a hard-coded client ID.
+Open http://localhost:8000. Use Python 3.10+ and install `requirements.txt` when creating a new virtual environment. Copy `.env.example` to `.env` and configure a stable `SECRET_KEY`. Without it, sessions expire across restarts. `DATABASE_URL` defaults to `fantasy_frc.db` in the project directory, independent of the launch folder. Explicit database URLs remain authoritative. Google sign-in uses `GOOGLE_CLIENT_ID` from the server configuration; the browser no longer has a hard-coded client ID.
 
 ## League experience
 
@@ -46,6 +46,7 @@ Read `KICKOFF.md`. The BIOCORE metric names and weights are provisional examples
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
 node --check static/app.js
+node --test tests/frontend_checks.cjs
 ```
 
 Tests use isolated databases and cover permissions, migration, draft order, roster locking, waiver conflicts, trades, scoring, and playoffs. `tests/http_smoke.py` runs a separate temporary HTTP server and database to exercise authentication and the complete league API.
@@ -55,3 +56,11 @@ Tests use isolated databases and cover permissions, migration, draft order, rost
 `src/models.py`: persistence · `src/migrations.py`: legacy upgrades · `src/routers/leagues.py`: authorized season operations · `src/scoring.py`: season-independent metric scoring · `src/schemas.py`: validated API payloads · `static/`: browser application.
 
 API reference: http://localhost:8000/docs. Every league read requires membership; commissioner actions require ownership. League mutations serialize on the league row to prevent concurrent draft picks, joins, roster additions and trade acceptances from bypassing checks.
+
+## UI update delivery
+
+The home page serves content-versioned CSS and JavaScript with revalidation headers, so deployed updates do not depend on clearing browser caches. Palette previews have isolated colors; the Light preview remains legible inside every theme. Buttons share a subtle lift, two-ring halo, pressed state and keyboard focus treatment; reduced-motion settings suppress movement.
+
+Local changes and local accounts do not automatically update the hosted Render service or its database. Deploy the updated repository to Render to publish this revision. If the hosted database needs an administrator, run `python -m src.manage_admin admin` in the deployed service shell and enter the password privately at the prompts. Existing accounts and league data are retained.
+
+The systems check covers password login, admin authorization/revocation, legacy migration, concurrent league capacity/draft turns, lineups, waivers, trades, scoring and playoffs. Frontend regression checks cover all 36 palette transitions, storage failure, stale session/route responses, dialogs and non-overlapping draft polling.

@@ -1,9 +1,14 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const storage = {
+    get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+    set(key,value) { try { localStorage.setItem(key,value); } catch { /* Preferences still work for this visit. */ } },
+    remove(key) { try { localStorage.removeItem(key); } catch { /* No persistent session to clear. */ } },
+};
 let scoutQuery = '', scoutFilter = 'all';
-let token = localStorage.getItem('frc_token'), user = null, league = null, registerMode = false, refreshTimer, routeSerial = 0;
-try { user = JSON.parse(localStorage.getItem('frc_user')); } catch { /* invalid stored session */ }
+let token = storage.get('frc_token'), user = null, league = null, registerMode = false, refreshTimer, routeSerial = 0;
+try { user = JSON.parse(storage.get('frc_user')); } catch { /* invalid stored session */ }
 const draftLabel = status => ({PRE_DRAFT:'PRE DRAFT',ACTIVE:'DRAFT LIVE',COMPLETED:'DRAFT COMPLETE'}[status] || status);
 const tabs = [['home','League home'],['team','My team'],['draft','Draft room'],['players','FRC teams'],['matchups','Matchups'],['standings','Standings'],['transactions','Transactions'],['scoring','Scoring & rules']];
 const catalog = [[254,'The Cheesy Poofs'],[1678,'Citrus Circuits'],[1690,'Orbit'],[4414,'HighTide'],[1114,'Simbotics'],[2056,'OP Robotics'],[148,'Robowranglers'],[118,'Robonauts'],[1323,'MadTown Robotics'],[973,'Greybots'],[2910,'Jack in the Bot'],[6328,'Mechanical Advantage']];
@@ -18,8 +23,16 @@ const themes = [
 function renderThemes() {
     $('themes').innerHTML=themes.map(t=>{
         const selected=document.documentElement.dataset.theme===t.id;
-        return `<button type="button" class="theme-choice" data-action="theme" data-theme-choice="${t.id}" aria-pressed="${selected}"><span class="theme-swatches" aria-hidden="true">${t.colors.map(c=>`<i style="--swatch:${c}"></i>`).join('')}</span><strong>${t.name}</strong><small>${t.description}</small><span class="theme-state">${selected?'✓ Selected':'Choose theme'}</span></button>`;
+        const team=t.name.includes(' · ')?t.name.split(' · ')[0]:'FRC';
+        return `<button type="button" class="theme-choice" data-action="theme" data-theme-choice="${t.id}" aria-pressed="${selected}"><span class="theme-preview" data-palette="${t.id}" aria-hidden="true"><span class="preview-sidebar"><i></i><i></i><i></i></span><span class="preview-canvas"><span class="preview-topline"><b>${team}</b><i></i></span><span class="preview-lines"><i></i><i></i></span><span class="preview-chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span><span class="preview-orbit"></span></span><span class="theme-label"><strong>${t.name}</strong><span class="theme-check" aria-hidden="true">✓</span></span><span class="theme-description">${t.description}</span><span class="theme-state">${selected?'Selected':'Choose palette'}</span></button>`;
     }).join('');
+}
+function updateThemeSelection() {
+    for (const control of document.querySelectorAll('[data-theme-choice]')) {
+        const selected=control.dataset.themeChoice===document.documentElement.dataset.theme;
+        control.setAttribute('aria-pressed',String(selected));
+        control.querySelector('.theme-state').textContent=selected?'Selected':'Choose palette';
+    }
 }
 const metricLabels = {auto:'Autonomous production',teleop:'Teleop production',endgame:'Endgame contribution',cycles:'Completed scoring cycles',win:'Win / tie bonus',fouls:'Foul penalty units'};
 const button = (text, action, attrs='', style='ghost small') => `<button class="${style}" data-action="${action}" ${attrs}>${text}</button>`;
@@ -32,15 +45,21 @@ const locked = () => league.periods.some(p=>p.status==='OPEN') || (league.period
 const teamName = number => esc(catalog.find(t=>t[0]===number)?.[1] || 'FRC team · manually entered');
 function notify(message, error=false) { $('notice').textContent=message; $('notice').className=error?'error':''; $('notice').hidden=false; clearTimeout(notify.timer); notify.timer=setTimeout(()=>$('notice').hidden=true,error?12000:5500); }
 async function api(path, body, method='POST') {
-    const response = await fetch(path,{method:body===undefined?'GET':method,headers:{...(token?{Authorization:`Bearer ${token}`} : {}),...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+    const requestToken=token;
+    const response = await fetch(path,{method:body===undefined?'GET':method,headers:{...(requestToken?{Authorization:`Bearer ${requestToken}`} : {}),...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
     const data = await response.json();
-    if (response.status===401 && token) { logout(); throw new Error('Your session expired. Please sign in again.'); }
+    if (response.status===401 && requestToken && requestToken===token) { logout(); throw new Error('Your session expired. Please sign in again.'); }
     if (!response.ok) throw new Error(Array.isArray(data.detail)?data.detail.map(x=>`${x.loc.at(-1)}: ${x.msg}`).join('; '):data.detail || 'Request failed');
     return data;
 }
-function logout() { token=null;user=null;league=null;localStorage.removeItem('frc_token');localStorage.removeItem('frc_user');location.hash='leagues';route(); }
-function signedIn(data) { token=data.access_token;user={username:data.username,user_id:data.user_id,is_admin:!!data.is_admin};localStorage.setItem('frc_token',token);localStorage.setItem('frc_user',JSON.stringify(user));$('password').value='';route(); }
-function theme(name) { document.documentElement.dataset.theme=name;localStorage.setItem('frc_theme',name); }
+function logout() { clearInterval(refreshTimer);if($('modal').open)closeModal();token=null;user=null;league=null;storage.remove('frc_token');storage.remove('frc_user');location.hash='leagues';route(); }
+function signedIn(data) { clearTimeout(notify.timer);$('notice').hidden=true;token=data.access_token;user={username:data.username,user_id:data.user_id,is_admin:!!data.is_admin};storage.set('frc_token',token);storage.set('frc_user',JSON.stringify(user));$('password').value='';route(); }
+function theme(name) {
+    const selected=themes.some(t=>t.id===name)?name:'default';
+    document.documentElement.dataset.theme=selected;storage.set('frc_theme',selected);
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta)meta.content=({default:'#101216',light:'#f5f6fa',citrus:'#0c1015',poofs:'#101318',orbit:'#f3f4fa',hightide:'#0b171c'})[selected];
+}
 function showModal(title, html) { $('modalTitle').textContent=title;$('modalBody').innerHTML=html+'<p class="dialog-status error" role="status" id="dialogStatus"></p>';$('modal').showModal(); }
 function closeModal() { $('modal').close(); }
 function leaguePath(tab='home') { return `#league/${league.id}/${tab}`; }
@@ -50,7 +69,7 @@ function option(value,label,selected=false) { return `<option value="${esc(value
 function select(name,label,options) { return `<label>${label}<select name="${name}">${options}</select></label>`; }
 function activity(items) { return items.length?items.map(a=>`<div class="activity"><span class="tag">${esc(a.kind)}</span> ${esc(a.text)}<time datetime="${esc(a.at)}">${time(a.at)}</time></div>`).join(''):'<p class="muted">League activity will appear here.</p>'; }
 async function route() {
-    clearInterval(refreshTimer); const serial=++routeSerial;
+    clearInterval(refreshTimer);if($('modal').open)closeModal();const serial=++routeSerial;
     for(const id of ['gate','dashboard','league','profile','admin']) $(id).hidden=true;
     $('profileButton').hidden=$('logoutButton').hidden=!(token&&user);
     $('adminButton').hidden=!(token&&user?.is_admin);
@@ -65,7 +84,25 @@ async function route() {
         } else if(parts[0]==='league'&&/^\d+$/.test(parts[1])) {
             $('league').hidden=false;$('leagueContent').innerHTML='<div class="page-loading">Loading your league…</div>';
             const data=await api(`/api/leagues/${parts[1]}`);if(serial!==routeSerial)return;league=data;renderLeague(parts[2]||'home');
-            if(parts[2]==='draft') refreshTimer=setInterval(async()=>{if(document.hidden||$('modal').open)return;try{const d=await api(`/api/leagues/${parts[1]}`);if(serial!==routeSerial)return;if(d.draft.current_pick_index===league.draft.current_pick_index&&d.draft.status===league.draft.status&&d.member_count===league.member_count){league=d;return;}const pickField=document.querySelector('[data-form="pick"] input[name="team_number"]');const draftInput=pickField?.value;const draftFocused=document.activeElement===pickField;league=d;renderLeague('draft');const freshField=document.querySelector('[data-form="pick"] input[name="team_number"]');if(freshField&&draftInput&&d.draft.current_picker_id===user.user_id){freshField.value=draftInput;if(draftFocused)freshField.focus();}}catch(e){clearInterval(refreshTimer);notify(e.message,true);}},7000);
+            if(parts[2]==='draft') {
+                let refreshInFlight=false;
+                refreshTimer=setInterval(async()=>{
+                    if(document.hidden||$('modal').open||refreshInFlight)return;
+                    refreshInFlight=true;
+                    try {
+                        const d=await api(`/api/leagues/${parts[1]}`);
+                        if(serial!==routeSerial)return;
+                        if(d.draft.current_pick_index===league.draft.current_pick_index&&d.draft.status===league.draft.status&&d.member_count===league.member_count){league=d;return;}
+                        const pickField=document.querySelector('[data-form="pick"] input[name="team_number"]');
+                        const draftInput=pickField?.value,draftFocused=document.activeElement===pickField;
+                        league=d;renderLeague('draft');
+                        const freshField=document.querySelector('[data-form="pick"] input[name="team_number"]');
+                        if(freshField&&draftInput&&d.draft.current_picker_id===user.user_id){freshField.value=draftInput;if(draftFocused)freshField.focus();}
+                    } catch(error) {
+                        if(serial===routeSerial){clearInterval(refreshTimer);notify(error.message,true);}
+                    } finally {refreshInFlight=false;}
+                },7000);
+            }
         } else { $('dashboard').hidden=false;$('dashboard').innerHTML='<div class="page-loading">Loading your leagues…</div>';const data=await api('/api/leagues');if(serial!==routeSerial)return;renderDashboard(data); }
     } catch(error) { if(serial!==routeSerial)return;const target=parts[0]==='admin'?'admin':parts[0]==='league'?'leagueContent':'dashboard';$(target).innerHTML=empty('Couldn’t load this page',esc(error.message))+'<a href="#leagues" class="button ghost">My leagues</a>';notify(error.message,true); }
 }
@@ -73,7 +110,7 @@ function renderDashboard(leagues) {
     $('dashboard').innerHTML=`<div class="section-head"><div><p class="eyebrow">LEAGUE HEADQUARTERS</p><h1>Good to have you back, ${esc(user.username)}.</h1><p class="lead">Your leagues. Your lineups. Your next winning move.</p></div><div class="row">${button('Join a league','join','','ghost')}${button('+ Create league','create','','primary')}</div></div><div class="banner"><strong>BIOCORE preseason</strong> · Draft and organize your league now. Production, cycle, and bonus scoring templates stay provisional until your commissioner activates the season configuration.</div><div class="row between"><h2>My leagues <span class="muted">${leagues.length}</span></h2><span class="muted">Private leagues · Invite code required</span></div>${leagues.length?`<div class="grid">${leagues.map(l=>`<article class="panel league-card"><div class="row between"><span class="tag">${esc(draftLabel(l.draft_status))}</span><span class="muted">${l.member_count} / ${l.max_teams} managers</span></div><h2>${esc(l.name)}</h2><p class="muted">${esc(l.my_team_name)}<br>${l.starter_count} starters · ${l.roster_size-l.starter_count} bench · ${l.regular_weeks} periods</p><a class="button ghost full" href="#league/${l.id}/home">Open league <span aria-hidden="true">→</span></a></article>`).join('')}</div>`:`<div class="panel">${empty('Your first league starts here','Create a private league and invite your friends, or enter a code from your commissioner.')}</div>`}`;
 }
 function renderLeague(tab) {
-    if(!tabs.some(t=>t[0]===tab)&&tab!=='commissioner')tab='home';
+    if((!tabs.some(t=>t[0]===tab)&&tab!=='commissioner')||(tab==='commissioner'&&!owner()))tab='home';
     $('leagueHeading').innerHTML=`<a class="muted" href="#leagues">← My leagues</a><div class="section-head"><div><p class="eyebrow" style="margin-top:24px">${esc(draftLabel(league.draft_status))} · ${league.member_count} MANAGERS</p><h1>${esc(league.name)}</h1><p class="muted">${esc(league.my_team_name)} · ${owner()?'Commissioner':'Manager'}</p></div><div class="row">${button('Invite friends','invite','','ghost')}${button('↻ Refresh','refresh','','ghost')}</div></div>`;
     $('leagueTabs').innerHTML=[...tabs,...(owner()?[['commissioner','Commissioner']]:[])].map(([key,text])=>`<a href="${leaguePath(key)}" ${tab===key?'aria-current="page"':''}>${text}</a>`).join('');
     const views={home:homeView,team:teamView,draft:draftView,players:playersView,matchups:matchupsView,standings:standingsView,transactions:transactionsView,scoring:scoringView,commissioner:commissionerView};
@@ -130,14 +167,14 @@ function commissionerView() {
     const frozen=league.periods.some(p=>p.status!=='SCHEDULED'),s=league.scoring;
     return `<div class="banner"><strong>Season operations</strong> · Review scoring at kickoff → complete draft → open period → import robot results → finalize → process waivers → open next period.</div><div class="layout"><div class="stack"><div class="panel"><h2>Scoring configuration</h2><p class="muted">Rules freeze after the first period opens. Choose your version and review every weight before activating.</p><form data-form="scoring"><fieldset ${frozen?'disabled':''} style="border:0;padding:0;margin:0">${field('version','Rules version','text',s.version,'required maxlength="80"')}${select('aggregation','Period aggregation',option('average','Average per played match',s.aggregation==='average')+option('sum','Sum of played matches',s.aggregation==='sum'))}<div class="form-grid">${Object.entries(s.weights).map(([k,v])=>field(k,metricLabels[k],'number',v,'required step="0.1" min="-100" max="100"')).join('')}</div><label class="check"><input type="checkbox" name="active" ${league.scoring_active?'checked':''}>I reviewed the season mapping. Activate these rules.</label><button class="primary full">Save scoring rules</button></fieldset></form>${frozen?'<p class="muted">Scoring is frozen for this season.</p>':''}</div><div class="panel"><h2>Period controls</h2><p class="muted">Opening immediately freezes starter lineups and blocks transactions. Finalization is permanent. Review imported records before finalizing, including any robots with no match data.</p>${league.periods.map(p=>`<div class="robot"><div><strong>Period ${p.week}</strong><div class="muted">${esc(p.kind)} · ${esc(p.status)}</div></div><div class="row">${p.status==='SCHEDULED'?button('Open period','open-period',`data-week="${p.week}"`):p.status==='OPEN'?button('Import JSON','import',`data-week="${p.week}"`,'primary small')+button('Finalize','finalize',`data-week="${p.week}"`):'<span class="tag">FINAL</span>'}</div></div>`).join('')||'<p class="muted">Complete the draft to generate the schedule.</p>'}</div></div><div class="stack"><div class="panel"><h2>League setup</h2><div class="rule-row"><span>Managers</span><strong>${league.member_count} / ${league.max_teams}</strong></div><div class="rule-row"><span>Roster</span><strong>${league.starter_count} starters + ${league.roster_size-league.starter_count} bench</strong></div><div class="rule-row"><span>Season</span><strong>${league.regular_weeks} regular periods</strong></div><div class="rule-row"><span>Playoffs</span><strong>${league.playoff_teams?'4 managers · 2 rounds':'Disabled'}</strong></div>${league.draft_status==='PRE_DRAFT'?button('Start snake draft','start-draft','','primary full'):''}</div><div class="panel"><h2>Waiver processing</h2><p class="muted">Claims resolve using current rolling priority. Conflicts and invalid drops fail without changing rosters. Results appear in the transaction log.</p>${button('Process pending claims','process-waivers',locked()||league.draft_status!=='COMPLETED'?'disabled':'','ghost full')}</div><div class="panel"><h2>Invite code</h2><p class="code">${esc(league.invite_code)}</p><p class="muted">Rotating invalidates the old invite immediately.</p>${button('Rotate invite code','rotate','','ghost full')}</div></div></div>`;
 }
-async function mutate(path,body={}){const r=await api(`/api/leagues/${league.id}/${path}`,body);notify(r.message||'Saved');closeModal();await route();}
+async function mutate(path,body={}){const serial=routeSerial,id=league.id;const r=await api(`/api/leagues/${id}/${path}`,body);if(serial!==routeSerial)return;notify(r.message||'Saved');closeModal();await route();}
 function confirmAction(title,text,action,attrs=''){showModal(title,`<p class="muted">${text}</p>${button('Confirm','confirm-'+action,attrs,'primary full')}`);}
 const actions={
 create(){showModal('Create your league',`<form data-form="create">${field('name','League name','text','','required maxlength="100"')}<div class="form-grid">${field('max_teams','Maximum managers','number',8,'min="2" max="32" required')}${field('regular_weeks','Regular-season periods','number',6,'min="1" max="12" required')}${field('roster_size','FRC teams per manager','number',5,'min="1" max="12" required')}${field('starter_count','Scoring starters','number',3,'min="1" max="12" required')}${select('preset','Scoring template',option('standard','Standard')+option('half_ppr','Half PPR · +0.5 per cycle')+option('ppr','Full PPR · +1 per cycle'))}${select('playoff_teams','Playoffs',option(0,'None · regular-season standings')+option(4,'Top 4 · semifinals + final'))}</div><p class="muted">Season structure is fixed at creation. Scoring can be tuned before the first period opens. A random invite code will be ready to share.</p><button class="primary full">Create league</button></form>`);},
 join(){showModal('Join a private league',`<form data-form="join">${field('code','12-character invite code','text','','required pattern="[a-fA-F0-9]{12}" minlength="12" maxlength="12" placeholder="A7C9E2B4D6F8" autocomplete="off"')}<p class="muted">Ask your commissioner for the code. Joining closes when the draft starts.</p><button class="primary full">Join league</button></form>`);},
 invite(){showModal('Invite your friends',`<p class="muted">Share this code. Friends can sign in and choose “Join a league.”</p><p class="code">${esc(league.invite_code)}</p>${button('Copy invite code','copy-invite','','primary full')}<p class="muted">${league.member_count} / ${league.max_teams} managers · Joining ${league.draft_status==='PRE_DRAFT'?'open':'closed'}</p>`);},
 async 'copy-invite'(){await navigator.clipboard.writeText(league.invite_code);notify('Invite code copied');},
-refresh(){return route();},theme(el){const choice=el.dataset.themeChoice;theme(choice);renderThemes();document.querySelector(`[data-theme-choice="${choice}"]`).focus({preventScroll:true});},
+refresh(){return route();},theme(el){theme(el.dataset.themeChoice);updateThemeSelection();},
 rename(){showModal('Name your fantasy team',`<form data-form="rename">${field('name','Team name','text',mine().name,'required maxlength="100"')}<button class="primary full">Save team name</button></form>`);},
 'start-draft'(){confirmAction('Start the snake draft?',`This closes joining and randomizes the order for ${league.member_count} managers. Each will draft ${league.roster_size} FRC teams. The draft cannot be reset. Ensure every manager is ready.`,'start-draft');},
 'confirm-start-draft'(){return mutate('draft/start');},
@@ -156,12 +193,12 @@ rotate(){confirmAction('Rotate invite code?','The old code will stop working imm
 'confirm-rotate'(){return mutate('invite/rotate');},
 'open-period'(el){confirmAction(`Open period ${el.dataset.week}?`,'Starter lineups freeze now. Lineup changes, trades, waivers, and drops lock until finalization.','open',`data-week="${el.dataset.week}"`);},
 'confirm-open'(el){return mutate(`periods/${el.dataset.week}/open`);},
-async finalize(el){const records=await api(`/api/leagues/${league.id}/periods/${el.dataset.week}/scores`);const recorded=new Set(records.map(r=>r.team_number));const missing=league.rosters.flatMap(r=>r.teams.filter(t=>t.position==='STARTER'&&!recorded.has(t.number)).map(t=>t.number));confirmAction(`Finalize period ${el.dataset.week}?`,`Imported robot match records: ${records.length}. ${missing.length?`Starters without records: ${missing.join(', ')}; these score zero. `:''}Review all matches and corrections first. Finalization is permanent and may advance playoff rounds.`,'finalize',`data-week="${el.dataset.week}"`);},
+async finalize(el){const currentLeague=league,serial=routeSerial;const records=await api(`/api/leagues/${currentLeague.id}/periods/${el.dataset.week}/scores`);if(serial!==routeSerial||league?.id!==currentLeague.id)return;const recorded=new Set(records.map(r=>r.team_number));const missing=league.rosters.flatMap(r=>r.teams.filter(t=>t.position==='STARTER'&&!recorded.has(t.number)).map(t=>t.number));confirmAction(`Finalize period ${el.dataset.week}?`,`Imported robot match records: ${records.length}. ${missing.length?`Starters without records: ${missing.join(', ')}; these score zero. `:''}Review all matches and corrections first. Finalization is permanent and may advance playoff rounds.`,'finalize',`data-week="${el.dataset.week}"`);},
 'confirm-finalize'(el){return mutate(`periods/${el.dataset.week}/finalize`);},
 import(el){const sample=JSON.stringify({rules_version:league.scoring.version,records:[{match_key:'event_qm1',team_number:254,metrics:{auto:0,teleop:0,endgame:0,cycles:0,win:0,fouls:0}}]},null,2);showModal(`Import period ${el.dataset.week} results`,`<p class="muted">Paste normalized robot-level results. Reimporting a match/team replaces the prior record. Include every metric with a nonzero weight and the matching rules version.</p><form data-form="import" data-week="${el.dataset.week}"><label>Normalized JSON<textarea name="json" rows="12" required spellcheck="false" placeholder="${esc(sample)}"></textarea></label><p class="muted">The example is a zero-value format guide, not real results. Only import verified data.</p><button class="primary full">Validate & import</button></form>`);},
 'remove-score'(el){confirmAction('Remove incorrect match record?','This removes the selected robot observation and recalculates provisional scores. Finalized periods cannot be changed.','remove-score',`data-week="${el.dataset.week}" data-id="${el.dataset.id}"`);},
 async 'confirm-remove-score'(el){const r=await api(`/api/leagues/${league.id}/periods/${el.dataset.week}/scores/${el.dataset.id}`,{},'DELETE');notify(r.message);closeModal();await route();},
-async 'score-detail'(el){const rows=await api(`/api/leagues/${league.id}/periods/${el.dataset.week}/scores`);showModal(`Period ${el.dataset.week} · Robot points`,rows.length?`<p class="muted">Per-match points before averaging or summing over the period.</p><div class="table-wrap"><table><thead><tr><th>Match</th><th>Robot</th><th>Points</th><th>Correction</th><th>Metrics</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.match_key)}</td><td>${r.team_number}</td><td>${r.points}</td><td>${owner()&&league.periods.find(p=>p.week===Number(el.dataset.week))?.status==='OPEN'?button('Remove incorrect record','remove-score',`data-week="${el.dataset.week}" data-id="${r.id}"`):''}</td><td>${esc(Object.entries(r.metrics).map(([k,v])=>`${k}: ${v}`).join(' · '))}</td></tr>`).join('')}</tbody></table></div>`:empty('No match records','Your commissioner can import played-match results into an open period.'));}
+async 'score-detail'(el){const currentLeague=league,serial=routeSerial;const rows=await api(`/api/leagues/${currentLeague.id}/periods/${el.dataset.week}/scores`);if(serial!==routeSerial||league?.id!==currentLeague.id)return;showModal(`Period ${el.dataset.week} · Robot points`,rows.length?`<p class="muted">Per-match points before averaging or summing over the period.</p><div class="table-wrap"><table><thead><tr><th>Match</th><th>Robot</th><th>Points</th><th>Correction</th><th>Metrics</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.match_key)}</td><td>${r.team_number}</td><td>${r.points}</td><td>${owner()&&league.periods.find(p=>p.week===Number(el.dataset.week))?.status==='OPEN'?button('Remove incorrect record','remove-score',`data-week="${el.dataset.week}" data-id="${r.id}"`):''}</td><td>${esc(Object.entries(r.metrics).map(([k,v])=>`${k}: ${v}`).join(' · '))}</td></tr>`).join('')}</tbody></table></div>`:empty('No match records','Your commissioner can import played-match results into an open period.'));}
 };
 document.addEventListener('click',async event=>{const el=event.target.closest('[data-action]');if(!el||el.disabled)return;const action=actions[el.dataset.action];if(!action)return;el.disabled=true;try{await action(el);}catch(error){if($('modal').open)$('dialogStatus').textContent=error.message;else notify(error.message,true);}finally{el.disabled=false;}});
 document.addEventListener('change',event=>{if(event.target.name!=='receiver_id')return;const roster=league.rosters.find(r=>r.id===Number(event.target.value));event.target.form.elements.receive_number.innerHTML=(roster?.teams||[]).map(t=>option(t.number,`FRC ${t.number}`)).join('');});
@@ -185,7 +222,8 @@ $('authToggle').addEventListener('click',()=>{registerMode=!registerMode;$('auth
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();$('main').focus();});
 $('closeModal').addEventListener('click',closeModal);$('logoutButton').addEventListener('click',logout);$('profileButton').addEventListener('click',()=>location.hash='profile');
 $('rulesLink').addEventListener('click',event=>{event.preventDefault();if(league){location.hash=leaguePath('scoring');return;}showModal('Fantasy FRC scoring','<p>Leagues choose production weights, win bonuses, and foul deductions. Half and full PPR templates add points per completed scoring cycle. Starter robot match points are averaged or summed over a period.</p><p class="muted">BIOCORE templates remain provisional until the commissioner reviews the released game and activates season rules.</p>');});
-window.addEventListener('hashchange',route);const savedTheme=localStorage.getItem('frc_theme');theme(themes.some(t=>t.id===savedTheme)?savedTheme:'default');route();
-if(token&&user) api('/api/auth/me').then(data=>{if(!token)return;user=data;localStorage.setItem('frc_user',JSON.stringify(user));route();}).catch(error=>notify(error.message,true));
+window.addEventListener('hashchange',route);const savedTheme=storage.get('frc_theme');theme(themes.some(t=>t.id===savedTheme)?savedTheme:'default');route();
+const accountToken=token;
+if(accountToken&&user) api('/api/auth/me').then(data=>{if(token!==accountToken)return;user=data;storage.set('frc_user',JSON.stringify(user));route();}).catch(error=>notify(error.message,true));
 $('adminButton').onclick=()=>{location.hash='admin';};
 fetch('/api/auth/config').then(r=>r.json()).then(config=>{if(!config.google_client_id)return;const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;script.onload=()=>{google.accounts.id.initialize({client_id:config.google_client_id,callback:async response=>{try{signedIn(await api('/api/auth/google',{credential:response.credential}));}catch(error){$('authStatus').textContent=error.message;}}});google.accounts.id.renderButton($('googleButton'),{theme:'outline',size:'large'});};document.head.appendChild(script);}).catch(()=>{});

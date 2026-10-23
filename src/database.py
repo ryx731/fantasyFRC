@@ -1,12 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database URL
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fantasy_frc.db")
+# Keep local accounts and leagues in the same database regardless of which
+# directory an IDE, CLI or service uses to launch the application. An explicit
+# deployment DATABASE_URL always takes precedence.
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_DATABASE_URL = "sqlite:///" + (PROJECT_DIR / "fantasy_frc.db").as_posix()
+DATABASE_URL = os.getenv("DATABASE_URL") or DEFAULT_DATABASE_URL
 
 # Create engine
 engine = create_engine(
