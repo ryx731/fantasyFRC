@@ -1,4 +1,4 @@
-"""Additive SQLite upgrades. Existing accounts, leagues, picks and scores are retained."""
+"""Additive SQLite/PostgreSQL upgrades that retain accounts, leagues and picks."""
 import secrets
 import sqlite3
 from pathlib import Path
@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from src.database import Base
 
 COLUMNS = {
-    'users': {'is_admin': 'BOOLEAN NOT NULL DEFAULT 0'},
+    # SQL boolean literals work on both databases; PostgreSQL rejects DEFAULT 0.
+    'users': {'is_admin': 'BOOLEAN NOT NULL DEFAULT FALSE'},
     'leagues': {
         'invite_code': 'VARCHAR', 'roster_size': 'INTEGER DEFAULT 5',
         'starter_count': 'INTEGER DEFAULT 3', 'regular_weeks': 'INTEGER DEFAULT 6',
         'playoff_teams': 'INTEGER DEFAULT 0', 'scoring_json': "TEXT DEFAULT '{}'",
-        'scoring_active': 'BOOLEAN DEFAULT 0', 'revision': 'INTEGER DEFAULT 0',
+        'scoring_active': 'BOOLEAN DEFAULT FALSE', 'revision': 'INTEGER DEFAULT 0',
     },
     'rosters': {'team_name': "VARCHAR DEFAULT ''", 'waiver_priority': 'INTEGER DEFAULT 1',
                 'watchlist': "TEXT DEFAULT '[]'"},
